@@ -1,0 +1,38 @@
+# Environments
+python_env/
+.venv/
+venv/
+ENV/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# VS Code / IDE settings
+.vscode/
+.idea/
+
+# Large model artifacts or raw large data dumps if needed (we can track processed data)
+*.zip
+*.tar.gz
+
+# Local agent & config files
+AGENTS.md
+PROJECT_CONFIG.md
+PROGRESS.md
+
+
+# Data directory (keep repository lightweight; run src/01_clean_data.py to recreate)
+data/
+
+
