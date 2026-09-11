@@ -44,10 +44,17 @@ Generates exploratory visualizations saved to `reports/figures/`:
 * **Macro trend:** Tracks total network consumption growth from ~15 MWh/month in early 2021 to over 35 MWh/month by late 2023.
 * **Metric selection:** Confirms that Weighted Absolute Percentage Error (WAPE) must be used over MAPE to handle sparse zero-demand hours.
 
-### 3. Next Steps
-* **Station Clustering (`src/03_cluster_stations.py`):** Use K-Means on behavioral features (daily volume, weekday ratio, peak hour, load factor) to give forecasting models station-type context.
-* **Multi-Tier Forecasting (`src/04_forecast_models.py`):** Benchmark Seasonal Naive vs. Ridge Regression vs. LightGBM on a held-out temporal test set.
-* **Automated Brief (`src/05_llm_report.py`):** Generate natural language operations summaries from pipeline metrics.
+### 3. Station Behavioral Profiling & Clustering (`src/03_cluster_stations.py`)
+Extracts a 4-dimensional behavioral fingerprint for all 35 stations and applies standardized K-Means clustering ($K=3$):
+* **High-Traffic Commuter Hubs (7 stations):** ~59.1 kWh/day average, sharp 8:00 AM arrival peak.
+* **Afternoon / Evening Hubs (9 stations):** ~15.1 kWh/day average, prominent 4:00 PM peak (post-work dining/shopping).
+* **Neighborhood / Community Ports (19 stations):** ~10.9 kWh/day average, quiet local charging spots.
+* Outputs cluster mapping to `data/processed/station_clusters.csv` and cluster profiles to `reports/figures/05_station_clusters.png`.
+
+### 4. Next Steps
+* **Multi-Tier Forecasting (`src/04_forecast_models.py`):** Benchmark Seasonal Naive Baseline vs. Ridge Regression vs. LightGBM on a held-out temporal test set (using station cluster features).
+* **Automated Operations Summary (`src/05_llm_report.py`):** Generate plain-English executive takeaways using an LLM.
+
 
 ---
 
@@ -91,4 +98,8 @@ python src/01_clean_data.py
 
 # Step 2: Run EDA and generate figures
 python src/02_eda.py
+
+# Step 3: Run station clustering and extract behavioral archetypes
+python src/03_cluster_stations.py
 ```
+

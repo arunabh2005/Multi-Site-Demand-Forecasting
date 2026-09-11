@@ -32,7 +32,11 @@ PROJECT_CONFIG.md
 PROGRESS.md
 
 
-# Data directory (keep repository lightweight; run src/01_clean_data.py to recreate)
-data/
+# Data directory (keep repository lightweight; ignore large CSVs, track small cluster mapping)
+data/*
+!data/processed/
+data/processed/*
+!data/processed/station_clusters.csv
+
 
 
