@@ -30,6 +30,8 @@ Thumbs.db
 AGENTS.md
 PROJECT_CONFIG.md
 PROGRESS.md
+ML_CONCEPTS_AND_INTERVIEWS.md
+project_requirements*.md
 .env
 .env.*
 !.env.example

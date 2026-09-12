@@ -8,9 +8,7 @@
 
 An end-to-end machine learning system for regularizing, profiling, and forecasting hourly electricity load across 35 municipal Electric Vehicle (EV) charging stations in the City of Boulder, Colorado.
 
-The platform transforms raw, uncoordinated transaction logs into a continuous Cartesian time-series grid (919,800 hourly observations), clusters charging stations into behavioral archetypes, benchmarks multi-tier predictive models under expanding walk-forward validation, performs out-of-sample residual diagnostics, and generates automated executive reports via the Google Gemini API.
-
-Detailed technical explanations and interview notes covering regularization, WAPE vs. MAPE, walk-forward validation, and lag engineering are documented in [`ML_CONCEPTS_AND_INTERVIEWS.md`](ML_CONCEPTS_AND_INTERVIEWS.md).
+The platform transforms raw, uncoordinated transaction logs into a continuous Cartesian time-series grid (919,800 hourly observations), clusters charging stations into behavioral archetypes, benchmarks multi-tier predictive models under expanding walk-forward validation, and generates automated executive reports via the Google Gemini API.
 
 ---
 
@@ -47,8 +45,7 @@ Raw Transaction Logs (148k+ events, 2021-2023)
                               * Tier 3: Poisson Gradient Boosted Trees (Champion)
                       |
                       v
-[ 05_evaluate.py ] ---------> Out-of-sample residual analysis (2023 holdout, 306,600 rows)
-                              * Bias calibration, error vs. volume, station rankings
+[ 05_evaluate.py ] ---------> Model residual evaluation & station error rankings
                       |
                       v
 [ 06_llm_report.py ] -------> Automated LLM synthesis via Google Gemini API
@@ -102,21 +99,9 @@ Stations were mapped into a 4-dimensional normalized feature space (`daily_volum
 
 ---
 
-## Out-of-Sample Diagnostics
-
-Evaluating the champion model across 306,600 held-out hours in 2023 revealed:
-* **Zero Chronic Bias:** Overall mean residual of **-0.0032 kWh**, confirming the absence of systemic over- or under-forecasting across the network.
-* **Volume-Predictability Relationship:** High-volume commuter hubs show the lowest error rates because aggregate user behavior smooths individual stochasticity.
-* **Anomaly Root-Cause Diagnosis:**
-  * `COMM VITALITY / BOULDER JCTN` achieved 0.00% error due to station decommissioning during 2023 (0.0 kWh total delivered).
-  * `BOULDER / RESERVOIR ST2` (250.04% WAPE) exhibits strong seasonal and weather-driven variance tied to summer lake recreation.
-  * `BOULDER / OSMP FLEET 1` (280.73% WAPE) serves municipal open-space maintenance vehicles with erratic, work-order-driven charging schedules.
-
----
-
 ## Automated Executive Reporting
 
-The system includes an automated intelligence layer (`src/06_llm_report.py`) that consumes pipeline artifacts (validation metrics, archetype statistics, station error rankings) and synthesizes a professional executive briefing via the Google Gemini API (model `gemini-2.5-flash`).
+The system includes an automated intelligence layer (`src/06_llm_report.py`) that consumes pipeline artifacts (validation metrics, archetype statistics, station error rankings) and synthesizes a professional executive briefing via the Google Gemini API (model `gemini-3.6-flash`).
 
 The briefing translates quantitative metrics into actionable grid operations strategies, including targeted Battery Energy Storage System (BESS) sizing for top commuter hubs and Time-of-Use (TOU) tariff shaping for afternoon stations. The generated report is exported to [`reports/EXECUTIVE_SUMMARY.md`](reports/EXECUTIVE_SUMMARY.md).
 
@@ -153,7 +138,6 @@ Multi-Site-Demand-Forecasting/
 ├── .env.example                       # Template for API configuration
 ├── .gitignore                         # Data and secret exclusion rules
 ├── LICENSE                            # MIT License
-├── ML_CONCEPTS_AND_INTERVIEWS.md      # Methodological reference and interview guide
 ├── README.md                          # Production project documentation
 └── requirements.txt                   # Dependency specifications
 ```
@@ -213,7 +197,7 @@ python src/03_cluster_stations.py
 # Step 4: Run expanding walk-forward multi-tier model benchmark
 python src/04_forecast_models.py
 
-# Step 5: Run out-of-sample residual diagnostics and station rankings
+# Step 5: Run model diagnostics and station rankings
 python src/05_evaluate.py
 
 # Step 6: Generate executive summary brief
@@ -236,5 +220,4 @@ python src/06_llm_report.py
 
 ## Author
 
-**Arunabh Das** ([LinkedIn](https://www.linkedin.com/in/arunabh-das-ba9a1725b/))  
-*Developed as part of the Municipal EV Infrastructure & Applied Machine Learning Initiative.*
+**Arunabh Das** ([LinkedIn](https://www.linkedin.com/in/arunabh-das-ba9a1725b/))
