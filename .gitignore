@@ -30,6 +30,11 @@ Thumbs.db
 AGENTS.md
 PROJECT_CONFIG.md
 PROGRESS.md
+.env
+.env.*
+!.env.example
+
+
 
 
 # Data directory (keep repository lightweight; ignore large CSVs, track small cluster mapping)

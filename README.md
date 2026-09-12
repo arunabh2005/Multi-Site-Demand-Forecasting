@@ -1,126 +1,240 @@
-# Multi-Site EV Demand Forecasting
+# Multi-Site Electric Vehicle Demand Forecasting
 
-A time-series forecasting project to predict hourly electricity demand across municipal Electric Vehicle (EV) charging stations in Boulder, Colorado. 
+[![Python 3.9+](https://img.shields.io/badge/Python-3.9+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![scikit-learn](https://img.shields.io/badge/scikit--learn-1.0+-F7931E?logo=scikit-learn&logoColor=white)](https://scikit-learn.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Status: Complete](https://img.shields.io/badge/Status-Complete-success.svg)]()
+[![Dataset: City of Boulder](https://img.shields.io/badge/Dataset-City%20of%20Boulder%20EV-informational.svg)](https://open-data.bouldercolorado.gov/datasets/cityofboulder::electric-vehicle-charging-station-data/about)
 
-The goal is to move from raw, sporadic charging transaction logs to reliable multi-station load forecasts, evaluating whether machine learning adds measurable value over standard statistical baselines.
+An end-to-end machine learning system for regularizing, profiling, and forecasting hourly electricity load across 35 municipal Electric Vehicle (EV) charging stations in the City of Boulder, Colorado.
 
-> **Engineering & Concept Reference:** For detailed interview explanations on time-series regularization, metric selection (WAPE vs. MAPE), walk-forward validation, and lag engineering, see [**`ML_CONCEPTS_AND_INTERVIEWS.md`**](ML_CONCEPTS_AND_INTERVIEWS.md).
+The platform transforms raw, uncoordinated transaction logs into a continuous Cartesian time-series grid (919,800 hourly observations), clusters charging stations into behavioral archetypes, benchmarks multi-tier predictive models under expanding walk-forward validation, performs out-of-sample residual diagnostics, and generates automated executive reports via the Google Gemini API.
 
-
----
-
-## The Problem
-
-Public EV chargers do not behave like a smooth, continuous power grid. Individual stations experience heavy intermittency: chargers sit completely idle for hours at a time, followed by sharp spikes when commuters plug in. 
-
-Because of this, standard textbook approaches often break down:
-* Over **95% of individual station-hours have 0.0 kWh demand**.
-* Traditional percentage metrics like MAPE divide by zero and explode on quiet hours.
-* Stations have distinct behavioral profiles (downtown commuter lots behave differently from public parks and rec centers).
+Detailed technical explanations and interview notes covering regularization, WAPE vs. MAPE, walk-forward validation, and lag engineering are documented in [`ML_CONCEPTS_AND_INTERVIEWS.md`](ML_CONCEPTS_AND_INTERVIEWS.md).
 
 ---
 
-## Data Source
+## Executive Overview
 
-The project uses open transaction records provided by the City of Boulder Open Data Portal:
-* **Portal Page:** [City of Boulder EV Charging Station Data](https://open-data.bouldercolorado.gov/datasets/cityofboulder::electric-vehicle-charging-station-data/about) (ArcGIS Hub Item: `95992b3938be4622b07f0b05eba95d4c`)
-* **Direct CSV Download:** [Download raw Boulder EV CSV](https://open-data.bouldercolorado.gov/api/download/v1/items/95992b3938be4622b07f0b05eba95d4c/csv?layers=0)
-* **Local Location:** Saved as `data/raw/boulder_ev_charging.csv`
-* **Timeframe:** January 1, 2021 – December 31, 2023 (3 full calendar years).
-* **Stations tracked:** 35 active municipal charging stations (filtered for consistent multi-year history).
-* **Target variable:** Total energy delivered in kilowatt-hours (`energy_kwh`) per station per hour.
+Municipal EV charging networks present a severe operational challenge for utilities and distribution system operators: **extreme demand sparsity**. Unlike macro-level grid demand, individual public chargers sit idle for extended periods, punctuated by sharp, unscheduled charging events.
 
+* **Sparsity:** 95.2% of all station-hours register zero energy delivery (0.0 kWh).
+* **Metric Failure:** Standard percentage error metrics such as Mean Absolute Percentage Error (MAPE) divide by zero and fail on intermittent data.
+* **Heterogeneity:** Stations exhibit divergent demand behavior based on urban zoning, from morning commuter lots to evening commercial districts and quiet recreational ports.
+
+This project implements an empirical solution to multi-site load forecasting under high zero-inflation, establishing a reproducible benchmark comparing seasonal baselines, regularized linear models, and Poisson-loss gradient boosted trees.
 
 ---
 
-## Current Progress & Pipeline
+## System Architecture
 
-### 1. Ingestion and Time-Series Regularization (`src/01_clean_data.py`)
-* Ingests ~148,000 raw charging events and filters to valid positive sessions between 2021 and 2023.
-* Builds a continuous Cartesian grid across all 35 stations for all 26,280 hours in the 3-year period (919,800 total station-hour rows).
-* Explicitly fills quiet and overnight hours with `0.0 kWh` to ensure predictable lag steps (`t-24`, `t-168`) for time-series modeling.
+```
+Raw Transaction Logs (148k+ events, 2021-2023)
+                      |
+                      v
+[ 01_clean_data.py ] -> Continuous Cartesian Grid (35 stations x 26,280 hours = 919,800 rows)
+                      |
+                      v
+[ 02_eda.py ] --------> Diurnal profiles, weekday/weekend splits, growth trends, sparsity analysis
+                      |
+                      v
+[ 03_cluster_stations.py ] -> 4D Behavioral Fingerprints & Standardized K-Means (K=3)
+                      |
+                      v
+[ 04_forecast_models.py ] --> 3-Fold Expanding Walk-Forward Validation (458,000+ test hours)
+                              * Tier 1: Seasonal Naive Baseline (t-168)
+                              * Tier 2: Ridge Regression (L2 regularization)
+                              * Tier 3: Poisson Gradient Boosted Trees (Champion)
+                      |
+                      v
+[ 05_evaluate.py ] ---------> Out-of-sample residual analysis (2023 holdout, 306,600 rows)
+                              * Bias calibration, error vs. volume, station rankings
+                      |
+                      v
+[ 06_llm_report.py ] -------> Automated LLM synthesis via Google Gemini API
+                              * Executive Briefing exported to reports/EXECUTIVE_SUMMARY.md
+```
 
-### 2. Exploratory Data Analysis (`src/02_eda.py`)
-Generates exploratory visualizations saved to `reports/figures/`:
-* **Diurnal load curve:** Identifies a sharp morning commute spike at 8:00 AM (~3.0 kWh weekday avg) and an afternoon plateau between 10:00 AM and 2:00 PM.
-* **Weekday vs. Weekend split:** Highlights heavy commuter dependency during the workweek compared to delayed, flatter weekend charging patterns.
-* **Macro trend:** Tracks total network consumption growth from ~15 MWh/month in early 2021 to over 35 MWh/month by late 2023.
-* **Metric selection:** Confirms that Weighted Absolute Percentage Error (WAPE) must be used over MAPE to handle sparse zero-demand hours.
+---
 
-### 3. Station Behavioral Profiling & Clustering (`src/03_cluster_stations.py`)
-Extracts a 4-dimensional behavioral fingerprint for all 35 stations and applies standardized K-Means clustering ($K=3$):
-* **High-Traffic Commuter Hubs (7 stations):** ~59.1 kWh/day average, sharp 8:00 AM arrival peak.
-* **Afternoon / Evening Hubs (9 stations):** ~15.1 kWh/day average, prominent 4:00 PM peak (post-work dining/shopping).
-* **Neighborhood / Community Ports (19 stations):** ~10.9 kWh/day average, quiet local charging spots.
-* Outputs cluster mapping to `data/processed/station_clusters.csv` and cluster profiles to `reports/figures/05_station_clusters.png`.
+## Benchmark Results
 
-### 4. Multi-Tier Forecasting & Walk-Forward Validation (`src/04_forecast_models.py`)
-Evaluates 3 model tiers using 3-fold expanding window Walk-Forward Validation (simulating periodic production retrainings across 2021–2023 with 458,000+ test hours):
+The forecasting models were evaluated using 3-fold expanding window Walk-Forward Validation, simulating chronological production deployments across 458,000+ out-of-sample test hours:
 
-| Model Tier | WAPE (%) | MAE (kWh) | RMSE (kWh) | Description |
-| :--- | :---: | :---: | :---: | :--- |
-| **Tier 3: Gradient Boosted Trees (Champion)** | **154.10%** | **1.524** | **5.515** | Non-linear tree splits with Poisson loss, multi-hour lags (`t-1..t-4`, `t-24`, `t-168`), and cluster context |
-| **Tier 1: Seasonal Naive (Baseline 1)** | 165.78% | 1.648 | 7.517 | Copy-paste rule (same hour last week $t-168$) |
-| **Tier 2: Ridge Regression (Baseline 2)** | 170.45% | 1.692 | 5.581 | Linear model with L2 regularization |
+| Model Tier | Algorithm | WAPE (%) | MAE (kWh) | RMSE (kWh) | Description |
+| :--- | :--- | :---: | :---: | :---: | :--- |
+| **Tier 3** | **Gradient Boosted Trees (Champion)** | **154.10%** | **1.524** | **5.515** | Non-linear tree splits with Poisson loss, multi-hour lags (`t-1..t-4`, `t-24`, `t-168`), rolling statistics, and cluster features |
+| Tier 1 | Seasonal Naive Baseline | 165.78% | 1.648 | 7.517 | Pure persistence model copying identical hour from previous week (`t-168`) |
+| Tier 2 | Ridge Regression | 170.45% | 1.692 | 5.581 | Linear feature combinations with L2 regularization penalty |
 
-* **Main Result:** Gradient Boosted Trees outperforms Seasonal Naive by **11.68 percentage points** (7.0% relative gain) and slashes catastrophic spike blunders (RMSE) by **26.6%** over the naive baseline.
-* Outputs scorecard to `reports/benchmark_results.csv` and 7-day forecast comparison to `reports/figures/06_forecast_vs_actual.png`.
+### Key Findings
 
-### 5. Next Steps
-* **Out-of-Sample Diagnostics & Residuals (`src/05_evaluate.py`):** Deep-dive into station-by-station error distributions and identify which locations are easiest vs hardest to predict.
-* **Automated AI Insights (`src/06_llm_report.py`):** Generate natural language executive operational briefs using an LLM.
+1. **Quantifiable Value of Machine Learning:** The champion Gradient Boosted Tree model delivers an **11.68 percentage point improvement** in WAPE over the Seasonal Naive baseline (a 7.0% relative improvement in total load allocation).
+2. **26.6% Reduction in Catastrophic Errors:** Gradient Boosted Trees reduced Root Mean Squared Error (RMSE) from 7.517 kWh down to 5.515 kWh. Because RMSE squares errors before averaging, this 26.6% reduction reflects a dramatic drop in severe peak-demand prediction blunders, mitigating local transformer overload risk.
+3. **Failure of Standard Linear Regression:** Ridge Regression exhibited the highest WAPE (170.45%). Under extreme zero-inflation, linear models apply an unconstrained continuous shift that predicts fractional "background buzz" across thousands of genuinely idle hours, accumulating substantial total error.
 
+---
 
+## Core Engineering Decisions
+
+### 1. Cartesian Grid Regularization & Zero Imputation
+Raw EV transaction logs record irregular timestamps (arrival and disconnect times). To enable valid time-series forecasting with stationary lag steps (`t-1`, `t-24`, `t-168`), we construct a complete Cartesian product:
+$$\text{Total Observations} = 35 \text{ stations} \times 26,280 \text{ hours} = 919,800 \text{ rows}$$
+All station-hours lacking active charging sessions are explicitly imputed with `0.0 kWh`.
+
+### 2. Metric Selection: WAPE over MAPE
+Given 95.2% zero values, classical MAPE:
+$$\text{MAPE} = \frac{1}{N}\sum \left|\frac{y - \hat{y}}{y}\right|$$
+is undefined due to division by zero. Adding arbitrary constants ($\epsilon$) artificially skews scores based on chosen epsilon scale. We utilize Weighted Absolute Percentage Error (WAPE):
+$$\text{WAPE} = \frac{\sum_{i=1}^{N} |y_i - \hat{y}_i|}{\sum_{i=1}^{N} y_i}$$
+WAPE weights errors proportionally by actual delivered energy, prioritizing high-load peak hours over quiet overnight intervals.
+
+### 3. Poisson Deviance Loss Function
+To combat non-negativity constraints and severe intermittency, Tier 3 Gradient Boosted Trees utilize a Poisson deviance loss:
+$$\text{Loss}(y, \hat{y}) = 2 \left( y \log \frac{y}{\hat{y}} - y + \hat{y} \right)$$
+When actual demand is zero ($y=0$), the loss simplifies to $2\hat{y}$. This introduces an asymmetric penalty that directly suppresses false-positive predictions during quiet hours, eliminating phantom baseline load.
+
+### 4. Station Behavioral Profiling & K-Means Clustering
+Stations were mapped into a 4-dimensional normalized feature space (`daily_volume_kwh`, `weekday_share`, `peak_hour`, `load_factor`). Using standardized K-Means ($K=3$), three distinct operating archetypes were identified:
+* **High-Traffic Commuter Hubs (7 stations):** ~59.1 kWh/day average, sharp 8:00 AM arrival peak, accounts for over 54% of total municipal load (167.8 MWh in 2023). Most predictable archetype (**142.89% WAPE**).
+* **Afternoon / Evening Hubs (9 stations):** ~15.1 kWh/day average, distinct 4:00 PM peak corresponding to commercial and recreational departures (**181.99% WAPE**).
+* **Neighborhood / Community Ports (19 stations):** ~10.9 kWh/day average, dispersed low-utilization chargers with intermittent patterns (**165.69% WAPE**).
+
+---
+
+## Out-of-Sample Diagnostics
+
+Evaluating the champion model across 306,600 held-out hours in 2023 revealed:
+* **Zero Chronic Bias:** Overall mean residual of **-0.0032 kWh**, confirming the absence of systemic over- or under-forecasting across the network.
+* **Volume-Predictability Relationship:** High-volume commuter hubs show the lowest error rates because aggregate user behavior smooths individual stochasticity.
+* **Anomaly Root-Cause Diagnosis:**
+  * `COMM VITALITY / BOULDER JCTN` achieved 0.00% error due to station decommissioning during 2023 (0.0 kWh total delivered).
+  * `BOULDER / RESERVOIR ST2` (250.04% WAPE) exhibits strong seasonal and weather-driven variance tied to summer lake recreation.
+  * `BOULDER / OSMP FLEET 1` (280.73% WAPE) serves municipal open-space maintenance vehicles with erratic, work-order-driven charging schedules.
+
+---
+
+## Automated Executive Reporting
+
+The system includes an automated intelligence layer (`src/06_llm_report.py`) that consumes pipeline artifacts (validation metrics, archetype statistics, station error rankings) and synthesizes a professional executive briefing via the Google Gemini API (model `gemini-2.5-flash`).
+
+The briefing translates quantitative metrics into actionable grid operations strategies, including targeted Battery Energy Storage System (BESS) sizing for top commuter hubs and Time-of-Use (TOU) tariff shaping for afternoon stations. The generated report is exported to [`reports/EXECUTIVE_SUMMARY.md`](reports/EXECUTIVE_SUMMARY.md).
 
 ---
 
 ## Project Structure
 
 ```
+Multi-Site-Demand-Forecasting/
 ├── data/
-│   ├── raw/                 # Raw Boulder transaction CSVs
-│   └── processed/           # Continuous hourly grid (generated)
+│   ├── raw/                           # Raw Boulder transaction CSVs (git-ignored)
+│   └── processed/
+│       └── station_clusters.csv       # Station cluster metadata and archetypes
 ├── reports/
-│   └── figures/             # Exported EDA and evaluation plots
+│   ├── figures/                       # Publication-ready visualizations
+│   │   ├── 01_diurnal_hourly_profile.png
+│   │   ├── 02_weekday_vs_weekend.png
+│   │   ├── 03_monthly_trend_growth.png
+│   │   ├── 04_station_demand_disparity.png
+│   │   ├── 05_station_clusters.png
+│   │   ├── 06_forecast_vs_actual.png
+│   │   ├── 07_residual_analysis.png
+│   │   └── 08_station_error_rankings.png
+│   ├── benchmark_results.csv          # Walk-forward model scorecard
+│   ├── station_performance.csv        # 35-station accuracy rankings
+│   └── EXECUTIVE_SUMMARY.md           # LLM-generated operational brief
 ├── src/
-│   ├── 01_clean_data.py     # Ingestion and hourly resampling
-│   ├── 02_eda.py            # Exploratory data analysis suite
-│   ├── 03_cluster_stations.py
-│   ├── 04_forecast_models.py
-│   └── 05_llm_report.py
-├── .gitignore
-├── ML_CONCEPTS_AND_INTERVIEWS.md
-├── README.md
-└── requirements.txt
+│   ├── 01_clean_data.py               # Ingestion and Cartesian hourly resampling
+│   ├── 02_eda.py                      # Exploratory data analysis suite
+│   ├── 03_cluster_stations.py         # K-Means behavioral clustering
+│   ├── 04_forecast_models.py          # Multi-tier walk-forward benchmark
+│   ├── 05_evaluate.py                 # Out-of-sample diagnostics & residual analysis
+│   └── 06_llm_report.py               # Automated AI executive briefing generator
+├── .env.example                       # Template for API configuration
+├── .gitignore                         # Data and secret exclusion rules
+├── LICENSE                            # MIT License
+├── ML_CONCEPTS_AND_INTERVIEWS.md      # Methodological reference and interview guide
+├── README.md                          # Production project documentation
+└── requirements.txt                   # Dependency specifications
 ```
 
 ---
 
-## How to Run
+## Getting Started
 
-### Setup
+### Prerequisites
+
+* Python 3.9 or higher
+* Recommended environment: Virtual environment (`venv` or `conda`)
+
+### Installation
+
 ```bash
 # Clone the repository
 git clone https://github.com/arunabh2005/Multi-Site-Demand-Forecasting.git
 cd Multi-Site-Demand-Forecasting
 
+# Create and activate a virtual environment
+python -m venv venv
+# On Windows:
+.\venv\Scripts\activate
+# On Linux/macOS:
+source venv/bin/activate
+
 # Install dependencies
 pip install -r requirements.txt
 ```
 
-### Execution
+### Configuration
+
+Copy `.env.example` to `.env` to enable live LLM report generation (optional):
+
 ```bash
-# Step 1: Clean transactions and build hourly continuous grid
-python src/01_clean_data.py
-
-# Step 2: Run EDA and generate figures
-python src/02_eda.py
-
-# Step 3: Run station clustering and extract behavioral archetypes
-python src/03_cluster_stations.py
-
-# Step 4: Run Walk-Forward multi-tier forecasting benchmark
-python src/04_forecast_models.py
+# Set your Gemini API key (free tier supported)
+GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
+*Note: If no API key is provided, `src/06_llm_report.py` will run in local deterministic mode and generate a complete report using embedded analytical templates.*
 
+### Running the Pipeline
+
+Execute each pipeline stage sequentially:
+
+```bash
+# Step 1: Regularize transaction logs into a continuous hourly grid
+python src/01_clean_data.py
+
+# Step 2: Generate exploratory visualizations and sparsity analysis
+python src/02_eda.py
+
+# Step 3: Cluster stations into behavioral archetypes
+python src/03_cluster_stations.py
+
+# Step 4: Run expanding walk-forward multi-tier model benchmark
+python src/04_forecast_models.py
+
+# Step 5: Run out-of-sample residual diagnostics and station rankings
+python src/05_evaluate.py
+
+# Step 6: Generate executive summary brief
+python src/06_llm_report.py
+```
+
+---
+
+## References & Acknowledgments
+
+* **City of Boulder Open Data Portal**: *Electric Vehicle Charging Station Data*, City of Boulder, Colorado ([Dataset Link](https://open-data.bouldercolorado.gov/datasets/cityofboulder::electric-vehicle-charging-station-data/about)).
+* **Intermittent Demand & Forecast Metric Literature**:
+  * Syntetos, A. A., & Boylan, J. E. (2005). *The accuracy of intermittent demand estimates*. International Journal of Forecasting, 21(2), 303-314.
+  * Hyndman, R. J., & Koehler, A. B. (2006). *Another look at measures of forecast accuracy*. International Journal of Forecasting, 22(4), 679-688.
+* **Poisson Regression & Gradient Boosting**:
+  * Nelder, J. A., & Wedderburn, R. W. (1972). *Generalized Linear Models*. Journal of the Royal Statistical Society: Series A (General), 135(3), 370-384.
+  * Friedman, J. H. (2001). *Greedy function approximation: A gradient boosting machine*. Annals of Statistics, 29(5), 1189-1232.
+
+---
+
+## Author
+
+**Arunabh Das** ([LinkedIn](https://www.linkedin.com/in/arunabh-das-ba9a1725b/))  
+*Developed as part of the Municipal EV Infrastructure & Applied Machine Learning Initiative.*
