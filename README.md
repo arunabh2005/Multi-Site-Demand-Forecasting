@@ -4,6 +4,9 @@ A time-series forecasting project to predict hourly electricity demand across mu
 
 The goal is to move from raw, sporadic charging transaction logs to reliable multi-station load forecasts, evaluating whether machine learning adds measurable value over standard statistical baselines.
 
+> **Engineering & Concept Reference:** For detailed interview explanations on time-series regularization, metric selection (WAPE vs. MAPE), walk-forward validation, and lag engineering, see [**`ML_CONCEPTS_AND_INTERVIEWS.md`**](ML_CONCEPTS_AND_INTERVIEWS.md).
+
+
 ---
 
 ## The Problem
@@ -51,9 +54,22 @@ Extracts a 4-dimensional behavioral fingerprint for all 35 stations and applies 
 * **Neighborhood / Community Ports (19 stations):** ~10.9 kWh/day average, quiet local charging spots.
 * Outputs cluster mapping to `data/processed/station_clusters.csv` and cluster profiles to `reports/figures/05_station_clusters.png`.
 
-### 4. Next Steps
-* **Multi-Tier Forecasting (`src/04_forecast_models.py`):** Benchmark Seasonal Naive Baseline vs. Ridge Regression vs. LightGBM on a held-out temporal test set (using station cluster features).
-* **Automated Operations Summary (`src/05_llm_report.py`):** Generate plain-English executive takeaways using an LLM.
+### 4. Multi-Tier Forecasting & Walk-Forward Validation (`src/04_forecast_models.py`)
+Evaluates 3 model tiers using 3-fold expanding window Walk-Forward Validation (simulating periodic production retrainings across 2021–2023 with 458,000+ test hours):
+
+| Model Tier | WAPE (%) | MAE (kWh) | RMSE (kWh) | Description |
+| :--- | :---: | :---: | :---: | :--- |
+| **Tier 3: Gradient Boosted Trees (Champion)** | **154.10%** | **1.524** | **5.515** | Non-linear tree splits with Poisson loss, multi-hour lags (`t-1..t-4`, `t-24`, `t-168`), and cluster context |
+| **Tier 1: Seasonal Naive (Baseline 1)** | 165.78% | 1.648 | 7.517 | Copy-paste rule (same hour last week $t-168$) |
+| **Tier 2: Ridge Regression (Baseline 2)** | 170.45% | 1.692 | 5.581 | Linear model with L2 regularization |
+
+* **Main Result:** Gradient Boosted Trees outperforms Seasonal Naive by **11.68 percentage points** (7.0% relative gain) and slashes catastrophic spike blunders (RMSE) by **26.6%** over the naive baseline.
+* Outputs scorecard to `reports/benchmark_results.csv` and 7-day forecast comparison to `reports/figures/06_forecast_vs_actual.png`.
+
+### 5. Next Steps
+* **Out-of-Sample Diagnostics & Residuals (`src/05_evaluate.py`):** Deep-dive into station-by-station error distributions and identify which locations are easiest vs hardest to predict.
+* **Automated AI Insights (`src/06_llm_report.py`):** Generate natural language executive operational briefs using an LLM.
+
 
 
 ---
@@ -73,6 +89,7 @@ Extracts a 4-dimensional behavioral fingerprint for all 35 stations and applies 
 │   ├── 04_forecast_models.py
 │   └── 05_llm_report.py
 ├── .gitignore
+├── ML_CONCEPTS_AND_INTERVIEWS.md
 ├── README.md
 └── requirements.txt
 ```
@@ -101,5 +118,9 @@ python src/02_eda.py
 
 # Step 3: Run station clustering and extract behavioral archetypes
 python src/03_cluster_stations.py
+
+# Step 4: Run Walk-Forward multi-tier forecasting benchmark
+python src/04_forecast_models.py
 ```
+
 
