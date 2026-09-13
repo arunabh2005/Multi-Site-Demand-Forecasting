@@ -6,25 +6,41 @@
 [![Status: Complete](https://img.shields.io/badge/Status-Complete-success.svg)]()
 [![Dataset: City of Boulder](https://img.shields.io/badge/Dataset-City%20of%20Boulder%20EV-informational.svg)](https://open-data.bouldercolorado.gov/datasets/cityofboulder::electric-vehicle-charging-station-data/about)
 
-An end-to-end machine learning system for regularizing, profiling, and forecasting hourly electricity load across 35 municipal Electric Vehicle (EV) charging stations in the City of Boulder, Colorado.
+An end-to-end machine learning pipeline for regularizing, profiling, and forecasting hourly electricity demand across 35 municipal Electric Vehicle (EV) charging stations in the City of Boulder, Colorado.
 
-The platform transforms raw, uncoordinated transaction logs into a continuous Cartesian time-series grid (919,800 hourly observations), clusters charging stations into behavioral archetypes, benchmarks multi-tier predictive models under expanding walk-forward validation, and generates automated executive reports via the Google Gemini API.
+The pipeline transforms raw, uncoordinated transaction logs into a continuous Cartesian time-series grid (919,800 hourly observations), segments charging stations into behavioral archetypes, benchmarks multi-tier predictive models under expanding walk-forward validation, and generates structured executive briefings via the Google Gemini API.
+
+---
+
+## Visual Pipeline & Results
+
+<p align="center">
+  <img src="reports/figures/06_forecast_vs_actual.png" alt="7-Day Actual vs. Forecasted Load Curve" width="850"/>
+</p>
+
+*Figure 1: 7-day out-of-sample forecast vs. actual demand across high-demand commuter stations. The gradient boosted tree model captures diurnal spikes while suppressing false baseline load.*
+
+<p align="center">
+  <img src="reports/figures/05_station_clusters.png" alt="Station Behavioral Clusters" width="850"/>
+</p>
+
+*Figure 2: K-Means clustering (K=3) in 4D behavioral feature space and 2D PCA projection, categorizing stations into Commuter Hubs, Afternoon Destinations, and Neighborhood Ports.*
 
 ---
 
 ## Executive Overview
 
-Municipal EV charging networks present a severe operational challenge for utilities and distribution system operators: **extreme demand sparsity**. Unlike macro-level grid demand, individual public chargers sit idle for extended periods, punctuated by sharp, unscheduled charging events.
+Municipal EV charging networks present a core operational challenge: **extreme demand intermittency**. Unlike aggregate utility-scale electricity demand, individual public chargers sit idle for long durations, punctuated by sharp, unscheduled charging sessions.
 
 * **Sparsity:** 95.2% of all station-hours register zero energy delivery (0.0 kWh).
-* **Metric Failure:** Standard percentage error metrics such as Mean Absolute Percentage Error (MAPE) divide by zero and fail on intermittent data.
+* **Metric Failure:** Classical percentage error metrics such as Mean Absolute Percentage Error (MAPE) divide by zero and fail on intermittent data.
 * **Heterogeneity:** Stations exhibit divergent demand behavior based on urban zoning, from morning commuter lots to evening commercial districts and quiet recreational ports.
 
-This project implements an empirical solution to multi-site load forecasting under high zero-inflation, establishing a reproducible benchmark comparing seasonal baselines, regularized linear models, and Poisson-loss gradient boosted trees.
+This project implements an empirical solution to multi-site load forecasting under high zero-inflation, establishing an open benchmark comparing seasonal baselines, regularized linear models, and Poisson-loss gradient boosted trees.
 
 ---
 
-## System Architecture
+## Pipeline Architecture
 
 ```
 Raw Transaction Logs (148k+ events, 2021-2023)
@@ -40,56 +56,65 @@ Raw Transaction Logs (148k+ events, 2021-2023)
                       |
                       v
 [ 04_forecast_models.py ] --> 3-Fold Expanding Walk-Forward Validation (458,000+ test hours)
-                              * Tier 1: Seasonal Naive Baseline (t-168)
-                              * Tier 2: Ridge Regression (L2 regularization)
-                              * Tier 3: Poisson Gradient Boosted Trees (Champion)
+                               * Tier 1: Seasonal Naive Baseline (t-168)
+                               * Tier 2: Ridge Regression (L2 regularization)
+                               * Tier 3: Poisson Gradient Boosted Trees (Primary Model)
                       |
                       v
 [ 05_evaluate.py ] ---------> Model residual evaluation & station error rankings
                       |
                       v
-[ 06_llm_report.py ] -------> Automated LLM synthesis via Google Gemini API
-                              * Executive Briefing exported to reports/EXECUTIVE_SUMMARY.md
+[ 06_llm_report.py ] -------> Automated analytical synthesis via Google Gemini API
+                               * Executive Briefing exported to reports/EXECUTIVE_SUMMARY.md
 ```
 
 ---
 
 ## Benchmark Results
 
-The forecasting models were evaluated using 3-fold expanding window Walk-Forward Validation, simulating chronological production deployments across 458,000+ out-of-sample test hours:
+Models were evaluated using 3-fold expanding window **Walk-Forward Validation**, simulating chronological out-of-sample forecasting across 458,000+ test hours:
 
-| Model Tier | Algorithm | WAPE (%) | MAE (kWh) | RMSE (kWh) | Description |
+| Model Tier | Algorithm | RMSE (kWh) | MAE (kWh) | WAPE (%) | Description |
 | :--- | :--- | :---: | :---: | :---: | :--- |
-| **Tier 3** | **Gradient Boosted Trees (Champion)** | **154.10%** | **1.524** | **5.515** | Non-linear tree splits with Poisson loss, multi-hour lags (`t-1..t-4`, `t-24`, `t-168`), rolling statistics, and cluster features |
-| Tier 1 | Seasonal Naive Baseline | 165.78% | 1.648 | 7.517 | Pure persistence model copying identical hour from previous week (`t-168`) |
-| Tier 2 | Ridge Regression | 170.45% | 1.692 | 5.581 | Linear feature combinations with L2 regularization penalty |
+| **Tier 3** | **Gradient Boosted Trees (Primary)** | **5.515** | **1.524** | **154.10%** | Non-linear tree splits with Poisson deviance loss, multi-hour lags (`t-1..t-4`, `t-24`, `t-168`), rolling momentum, and cluster features |
+| Tier 2 | Ridge Regression | 5.581 | 1.692 | 170.45% | Linear feature combinations with L2 regularization penalty |
+| Tier 1 | Seasonal Naive Baseline | 7.517 | 1.648 | 165.78% | Persistence baseline copying identical hour from previous week (`t-168`) |
+
+<p align="center">
+  <img src="reports/figures/08_station_error_rankings.png" alt="Station Forecast Error Rankings" width="850"/>
+</p>
+
+*Figure 3: Out-of-sample forecast error distribution (WAPE %) across all 35 charging sites.*
 
 ### Key Findings
 
-1. **Quantifiable Value of Machine Learning:** The champion Gradient Boosted Tree model delivers an **11.68 percentage point improvement** in WAPE over the Seasonal Naive baseline (a 7.0% relative improvement in total load allocation).
-2. **26.6% Reduction in Catastrophic Errors:** Gradient Boosted Trees reduced Root Mean Squared Error (RMSE) from 7.517 kWh down to 5.515 kWh. Because RMSE squares errors before averaging, this 26.6% reduction reflects a dramatic drop in severe peak-demand prediction blunders, mitigating local transformer overload risk.
-3. **Failure of Standard Linear Regression:** Ridge Regression exhibited the highest WAPE (170.45%). Under extreme zero-inflation, linear models apply an unconstrained continuous shift that predicts fractional "background buzz" across thousands of genuinely idle hours, accumulating substantial total error.
+1. **26.6% Reduction in Peak Forecast Error:** Gradient Boosted Trees reduced Root Mean Squared Error (RMSE) from **7.517 kWh down to 5.515 kWh** over the Seasonal Naive baseline. Because RMSE squares errors before averaging, this 26.6% reduction reflects a major decrease in severe peak-hour forecasting errors—the primary operational concern for grid infrastructure and transformer headroom planning.
+2. **Quantifiable Value Over Heuristics:** The tree model delivers an **11.68 percentage point improvement** in WAPE over the Seasonal Naive baseline (a 7.0% relative improvement in total load allocation).
+3. **Failure of Standard Linear Regression:** Ridge Regression exhibited the highest overall WAPE (170.45%). Under extreme zero-inflation, linear models apply an unconstrained continuous shift that predicts fractional "background buzz" across thousands of genuinely idle hours, accumulating substantial total absolute error.
+
+> **Note on WAPE in Intermittent Demand:**  
+> In continuous time-series where 95.2% of station-hours have zero demand (0.0 kWh), predicting even small fractional demand (e.g. 0.3 kWh) across thousands of idle hours accumulates absolute errors in the numerator, while the denominator contains only the concentrated positive volume of active charging sessions. Consequently, WAPE values exceeding 100% are expected and well-documented in intermittent demand literature (*Syntetos & Boylan, 2005*). For this reason, relative benchmark improvement and peak-error reduction (RMSE) are the primary indicators of operational value.
 
 ---
 
-## Core Engineering Decisions
+## Core Methodology & Engineering Decisions
 
 ### 1. Cartesian Grid Regularization & Zero Imputation
-Raw EV transaction logs record irregular timestamps (arrival and disconnect times). To enable valid time-series forecasting with stationary lag steps (`t-1`, `t-24`, `t-168`), we construct a complete Cartesian product:
+Raw EV transaction logs record event-based timestamps (plug-in and disconnect times). To enable valid time-series forecasting with stationary lag steps (`t-1`, `t-24`, `t-168`), we construct a complete Cartesian product:
 $$\text{Total Observations} = 35 \text{ stations} \times 26,280 \text{ hours} = 919,800 \text{ rows}$$
 All station-hours lacking active charging sessions are explicitly imputed with `0.0 kWh`.
 
 ### 2. Metric Selection: WAPE over MAPE
 Given 95.2% zero values, classical MAPE:
 $$\text{MAPE} = \frac{1}{N}\sum \left|\frac{y - \hat{y}}{y}\right|$$
-is undefined due to division by zero. Adding arbitrary constants ($\epsilon$) artificially skews scores based on chosen epsilon scale. We utilize Weighted Absolute Percentage Error (WAPE):
+is undefined due to division by zero. Adding arbitrary constants ($\epsilon$) artificially skews scores based on the chosen epsilon scale. We utilize Weighted Absolute Percentage Error (WAPE):
 $$\text{WAPE} = \frac{\sum_{i=1}^{N} |y_i - \hat{y}_i|}{\sum_{i=1}^{N} y_i}$$
 WAPE weights errors proportionally by actual delivered energy, prioritizing high-load peak hours over quiet overnight intervals.
 
 ### 3. Poisson Deviance Loss Function
-To combat non-negativity constraints and severe intermittency, Tier 3 Gradient Boosted Trees utilize a Poisson deviance loss:
+To address non-negativity constraints and severe intermittency, Tier 3 Gradient Boosted Trees utilize a Poisson deviance loss:
 $$\text{Loss}(y, \hat{y}) = 2 \left( y \log \frac{y}{\hat{y}} - y + \hat{y} \right)$$
-When actual demand is zero ($y=0$), the loss simplifies to $2\hat{y}$. This introduces an asymmetric penalty that directly suppresses false-positive predictions during quiet hours, eliminating phantom baseline load.
+When actual demand is zero ($y=0$), the loss simplifies to $2\hat{y}$. This introduces an asymmetric penalty that directly suppresses false-positive predictions during quiet hours, mitigating phantom baseline load.
 
 ### 4. Station Behavioral Profiling & K-Means Clustering
 Stations were mapped into a 4-dimensional normalized feature space (`daily_volume_kwh`, `weekday_share`, `peak_hour`, `load_factor`). Using standardized K-Means ($K=3$), three distinct operating archetypes were identified:
@@ -99,11 +124,11 @@ Stations were mapped into a 4-dimensional normalized feature space (`daily_volum
 
 ---
 
-## Automated Executive Reporting
+## Automated Analytical Reporting
 
-The system includes an automated intelligence layer (`src/06_llm_report.py`) that consumes pipeline artifacts (validation metrics, archetype statistics, station error rankings) and synthesizes a professional executive briefing via the Google Gemini API (model `gemini-3.6-flash`).
+The pipeline includes an analytical synthesis layer (`src/06_llm_report.py`) that consumes pipeline artifacts (validation metrics, archetype statistics, station error rankings) and generates an executive briefing via the Google Gemini API (model `gemini-3.8-flash`).
 
-The briefing translates quantitative metrics into actionable grid operations strategies, including targeted Battery Energy Storage System (BESS) sizing for top commuter hubs and Time-of-Use (TOU) tariff shaping for afternoon stations. The generated report is exported to [`reports/EXECUTIVE_SUMMARY.md`](reports/EXECUTIVE_SUMMARY.md).
+The briefing translates quantitative metrics into potential operational considerations, such as identifying candidates for localized Battery Energy Storage Systems (BESS) and Time-of-Use (TOU) tariff incentives for evening peak management. The generated report is exported to [`reports/EXECUTIVE_SUMMARY.md`](reports/EXECUTIVE_SUMMARY.md).
 
 ---
 
@@ -116,7 +141,7 @@ Multi-Site-Demand-Forecasting/
 │   └── processed/
 │       └── station_clusters.csv       # Station cluster metadata and archetypes
 ├── reports/
-│   ├── figures/                       # Publication-ready visualizations
+│   ├── figures/                       # Visualizations generated by pipeline
 │   │   ├── 01_diurnal_hourly_profile.png
 │   │   ├── 02_weekday_vs_weekend.png
 │   │   ├── 03_monthly_trend_growth.png
@@ -138,7 +163,7 @@ Multi-Site-Demand-Forecasting/
 ├── .env.example                       # Template for API configuration
 ├── .gitignore                         # Data and secret exclusion rules
 ├── LICENSE                            # MIT License
-├── README.md                          # Production project documentation
+├── README.md                          # Project documentation
 └── requirements.txt                   # Dependency specifications
 ```
 
@@ -178,7 +203,7 @@ Copy `.env.example` to `.env` to enable live LLM report generation (optional):
 GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
-*Note: If no API key is provided, `src/06_llm_report.py` will run in local deterministic mode and generate a complete report using embedded analytical templates.*
+*Note: If no API key is provided, `src/06_llm_report.py` runs in local deterministic fallback mode using pre-computed analytical templates.*
 
 ### Running the Pipeline
 

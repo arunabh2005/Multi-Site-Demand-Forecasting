@@ -100,7 +100,7 @@ BOULDER / OSMP FLEET 1           Afternoon / Evening Hub     280.73%      1,214.
 Prioritize behind-the-meter storage at top commuter sites (`BOULDER / BASELINE ST1` and `BOULDER / EAST REC`). These two sites alone consume over 54 MWh annually. Localized BESS will buffer morning peak coincidences (8:00 AM), reducing distribution transformer stress and mitigating Xcel Energy demand charges.
 
 ### 2. Dynamic Time-of-Use (TOU) & Managed Charging Tariffs
-Implement managed charging structures for **Afternoon / Evening Hubs** (4:00 PM peak). Incentivize drivers to defer peak evening charging to off-peak overnight windows via price signals, flattening localized distribution feeders.
+Implement managed charging structures for **Afternoon / Evening Hubs** (4:00 PM peak). Incentivize drivers to defer peak evening charging to off-peak overnight windows via price signals, flattening local distribution feeder ramps.
 
 ### 3. Live Weather & Fleet Telemetry Integration
 Incorporate ambient temperature feeds into the model pipeline to capture weather-sensitive recreational spikes at sites like `Boulder Reservoir`, and connect municipal work-order telemetry to anticipate `OSMP Fleet` charging sessions.
