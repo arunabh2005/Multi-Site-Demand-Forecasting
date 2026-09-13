@@ -80,6 +80,8 @@ Models were evaluated using 3-fold expanding window **Walk-Forward Validation**,
 | Tier 2 | Ridge Regression | 5.581 | 1.692 | 170.45% | Linear feature combinations with L2 regularization penalty |
 | Tier 1 | Seasonal Naive Baseline | 7.517 | 1.648 | 165.78% | Persistence baseline copying identical hour from previous week (`t-168`) |
 
+> **Key Takeaway:** The primary Gradient Boosted Tree model improves WAPE by 7.0% relative to the seasonal baseline and reduces RMSE by 26.6%, with the largest performance gains coming from reducing large peak-demand forecast errors.
+
 <p align="center">
   <img src="reports/figures/08_station_error_rankings.png" alt="Station Forecast Error Rankings" width="850"/>
 </p>
@@ -88,7 +90,7 @@ Models were evaluated using 3-fold expanding window **Walk-Forward Validation**,
 
 ### Key Findings
 
-1. **26.6% Reduction in Peak Forecast Error:** Gradient Boosted Trees reduced Root Mean Squared Error (RMSE) from **7.517 kWh down to 5.515 kWh** over the Seasonal Naive baseline. Because RMSE squares errors before averaging, this 26.6% reduction reflects a major decrease in severe peak-hour forecasting errors—the primary operational concern for grid infrastructure and transformer headroom planning.
+1. **26.6% Reduction in Peak Forecast Error:** Gradient Boosted Trees reduced Root Mean Squared Error (RMSE) from **7.517 kWh down to 5.515 kWh** over the Seasonal Naive baseline. Because RMSE squares errors before averaging, this lower RMSE reflects substantially fewer large forecast errors, which is particularly critical for peak-demand planning and infrastructure capacity estimation.
 2. **Quantifiable Value Over Heuristics:** The tree model delivers an **11.68 percentage point improvement** in WAPE over the Seasonal Naive baseline (a 7.0% relative improvement in total load allocation).
 3. **Failure of Standard Linear Regression:** Ridge Regression exhibited the highest overall WAPE (170.45%). Under extreme zero-inflation, linear models apply an unconstrained continuous shift that predicts fractional "background buzz" across thousands of genuinely idle hours, accumulating substantial total absolute error.
 
@@ -186,7 +188,7 @@ cd Multi-Site-Demand-Forecasting
 # Create and activate a virtual environment
 python -m venv venv
 # On Windows:
-.\venv\Scripts\activate
+venv\Scripts\activate
 # On Linux/macOS:
 source venv/bin/activate
 
